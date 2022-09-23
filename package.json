@@ -1,6 +1,7 @@
 {
   "name": "fortyweeks",
   "version": "0.1.0",
+  "homepage": "https://heathershea.github.io/fortyweeks",
   "private": true,
   "dependencies": {
     "@stitches/react": "^1.2.8",
