@@ -15,7 +15,7 @@ const Container = styled("button", {
   display: "inline-block",
   textAlign: "center",
   textDecoration: "none",
-  margin: "10px",
+  margin: "3px",
   padding: "8px 25px 8px 25px",
   background: "none",
   fontSize: "100%",
