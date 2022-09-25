@@ -1,6 +1,6 @@
 import { globalCss, styled } from "@stitches/react";
 import dayjs from "dayjs";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import ToolbarButton from "./toolbar-button";
 
 const globalStyles = globalCss({
@@ -122,12 +122,150 @@ const formatMoney = (amount: number) => {
   });
 };
 
+const generateMenstrualCycleLength = (prevLength: number) => {
+  return Math.floor((range(21, 35) + prevLength) / 2);
+};
+const generatePeriodLength = (prevLength: number) => {
+  return Math.floor(
+    (range(1, 10) + range(2, 7) + range(2, 7) + range(3, 8) + prevLength) / 5
+  );
+};
+
 const range = (min: number, max: number) =>
   Math.floor(Math.random() * (max - min + 1) + min);
 
-const App = () => {
-  const [date, setDate] = useState(dayjs("2022-01-01 00:00:00"));
+const initialDate = dayjs().startOf("day");
+const prevMenstrualCycleLength = generateMenstrualCycleLength(28);
+const initialMenstrualCycleLength = generateMenstrualCycleLength(
+  prevMenstrualCycleLength
+);
+
+const initialMenstruationStart = initialDate.subtract(
+  range(0, initialMenstrualCycleLength),
+  "days"
+);
+const initialPrevMenstruationStart = initialMenstruationStart.subtract(
+  initialMenstrualCycleLength,
+  "days"
+);
+
+const useMenstrualCycle = ({ date }: { date: dayjs.Dayjs }) => {
+  const [menstrualCycleLength, setMenstrualCycleLength] = useState(
+    initialMenstrualCycleLength
+  );
+  const [menstruationStart, setMenstruationStart] = useState<dayjs.Dayjs>(
+    initialMenstruationStart
+  );
+  const [previousMenstruationStart, setPreviousMenstruationStart] =
+    useState<dayjs.Dayjs>(initialPrevMenstruationStart);
+  const nextMenstruationStart = menstruationStart.add(
+    menstrualCycleLength,
+    "days"
+  );
+
+  const [periodLength, setPeriodLength] = useState(generatePeriodLength(4));
+  const menstruationEnd = menstruationStart.add(periodLength, "days");
+  const amMenstruating =
+    (date.isSame(menstruationStart) || date.isAfter(menstruationStart)) &&
+    (date.isSame(menstruationEnd) || date.isBefore(menstruationEnd));
+
+  const ovulationStart = menstruationStart.add(10, "days");
+  const ovulationEnd = ovulationStart.add(5, "days");
+
+  const amOvulating =
+    (date.isSame(ovulationStart) || date.isAfter(ovulationEnd)) &&
+    (date.isSame(ovulationEnd) || date.isBefore(ovulationEnd));
+
+  const [conceptionDate, setConceptionDate] = useState<dayjs.Dayjs>();
+  const gestationalDate = conceptionDate
+    ? previousMenstruationStart
+    : undefined;
   const [dueDate, setDueDate] = useState<dayjs.Dayjs>();
+  const [amPregnant, setAmPregnant] = useState(false);
+
+  useEffect(() => {
+    if (dueDate && !amPregnant) {
+      if (
+        date.isSame(nextMenstruationStart) ||
+        date.isAfter(nextMenstruationStart)
+      ) {
+        setAmPregnant(true);
+      }
+    }
+  }, [amPregnant, date, dueDate, nextMenstruationStart]);
+
+  useEffect(() => {
+    if (date.isSame(nextMenstruationStart) && !amPregnant) {
+      // generate next menstrual cycle
+      const nextMenstruatrualCycleLength =
+        generateMenstrualCycleLength(menstrualCycleLength);
+      const nextPeriodLength = generatePeriodLength(periodLength);
+      setMenstrualCycleLength(nextMenstruatrualCycleLength);
+      setPeriodLength(nextPeriodLength);
+      setPreviousMenstruationStart(menstruationStart);
+      setMenstruationStart(nextMenstruationStart);
+    }
+  }, [
+    amPregnant,
+    date,
+    menstrualCycleLength,
+    menstruationEnd,
+    menstruationStart,
+    nextMenstruationStart,
+    ovulationEnd,
+    ovulationStart,
+    periodLength
+  ]);
+
+  const becomePregnant = () => {
+    const conceptionChance = Math.random();
+    if (
+      (amOvulating && conceptionChance < 1 / 3) ||
+      (amMenstruating && conceptionChance < 0.05) ||
+      conceptionChance < 0.01
+    ) {
+      setDueDate((prev) => {
+        if (!prev) {
+          return date.add(range(37, 41), "weeks").add(range(0, 6), "days");
+        }
+        return prev;
+      });
+      setConceptionDate((prev) => {
+        if (!prev) {
+          return date;
+        }
+        return prev;
+      });
+    }
+  };
+
+  const weeksPregnant = gestationalDate
+    ? Math.floor(date.diff(gestationalDate, "days") / 7)
+    : NaN;
+
+  return {
+    amOvulating,
+    amMenstruating,
+    amPregnant,
+    gestationalDate,
+    becomePregnant,
+    weeksPregnant
+  };
+};
+
+const App = () => {
+  const [date, setDate] = useState(initialDate);
+  // average period is 28 days
+
+  const {
+    amPregnant,
+    amOvulating,
+    amMenstruating,
+    gestationalDate,
+    becomePregnant,
+    weeksPregnant
+  } = useMenstrualCycle({ date });
+
   // https://www.calculator.net/bac-calculator.html
   const [bac, setBAC] = useState(0);
   const [money, setMoney] = useState(10);
@@ -144,14 +282,9 @@ const App = () => {
   const amInebriated = bac > 0.1;
   const amTooDrunk = bac > 0.2;
 
-  const weeksPregnant = dueDate ? dueDate.diff(date, "weeks") : NaN;
-
   const isWeekend = [6, 0].includes(date.day());
   const teacherChecksIfStudied =
-    Math.random() > 0.8 &&
-    !isWeekend &&
-    homeworkScore > 0 &&
-    currentActivity === "default";
+    Math.random() > 0.8 && !isWeekend && currentActivity === "default";
 
   const camgirlTips =
     currentActivity === "work:camgirl"
@@ -219,7 +352,7 @@ const App = () => {
                   return [
                     "Being drunk you don't think too much about it and follow the guy.",
                     "",
-                    `As soon as you're in his car, he wastes no time, quickly taking off your ${currentOutfit}, while constantly making out with and groping you trough it. You do the same for him until his pants are off and you're left in your sexy underwear.`,
+                    `As soon as you're in his car, he wastes no time, quickly taking off your ${currentOutfits[currentOutfit]}, while constantly making out with and groping you trough it. You do the same for him until his pants are off and you're left in your sexy underwear.`,
                     "You gingerly remove your panties as he takes off his his underwear, and mount on top of him while he's laying down on the backseat of his car. You slowly start inserting his penis inside of you, moaning as it slides inside your vagina.",
                     "You then start moving your hips forwards and backwards, grinding onto him, moaning in pleasure has he lovingly fondles your breasts.",
                     "This keeps going until your both panting and out of breath, as you get to the brink of orgasm. You hug your lover tightly as he gets ready to cum. You increase your pace as he groans and releases hit hot seed inside of you, you accept it with a massive orgasm, screaming and moaning.",
@@ -243,7 +376,7 @@ const App = () => {
       currentActivity === "prepareToGoOutTonight:goDanceForAWhile:followHim"
     ) {
       return [
-        `As soon as you're in his car, he wastes no time, quickly taking off your ${currentOutfit}, while constantly making out with and groping you trough it. You do the same for him until his pants are off and you're left in your sexy underwear.`,
+        `As soon as you're in his car, he wastes no time, quickly taking off your ${currentOutfits[currentOutfit]}, while constantly making out with and groping you trough it. You do the same for him until his pants are off and you're left in your sexy underwear.`,
         "You gingerly remove your panties as he takes off his his underwear, and mount on top of him while he's laying down on the backseat of his car. You slowly start inserting his penis inside of you, moaning as it slides inside your vagina.",
         "You then start moving your hips forwards and backwards, grinding onto him, moaning in pleasure has he lovingly fondles your breasts.",
         "This keeps going until your both panting and out of breath, as you get to the brink of orgasm. You hug your lover tightly as he gets ready to cum. You increase your pace as he groans and releases hit hot seed inside of you, you accept it with a massive orgasm, screaming and moaning.",
@@ -342,7 +475,7 @@ const App = () => {
               "",
               '"Oh god, yes, yes, god yes!"',
               "",
-              "The chat thinks you're just hamming it up, but this is as real as it gets. Aa you feel yourself getting closer and closer to a massive climax, you arch your back and come like you've never come before. You're completely out of breath. Taking the hand out of your pussy you slowly bring it to your mouth and lick your juices off your fingers."
+              "The chat thinks you're just hamming it up, but this is as real as it gets. As you feel yourself getting closer and closer to a massive climax, you arch your back and come like you've never come before. You're completely out of breath. Taking the hand out of your pussy you slowly bring it to your mouth and lick your juices off your fingers."
             ];
           }
           if (camgirlTips > 0) {
@@ -432,16 +565,17 @@ const App = () => {
         "",
         "You spend a half an hour getting examined by the doctor.",
         ...(() => {
-          if (dueDate) {
+          if (amPregnant) {
             return [
               "After dressing up the doctor sits you down at his desk with a somewhat concerned look on his face.",
               '"Is there something wrong?" You ask him.',
               '"Well..." He says while looking down at the paperwork.',
-              `"You're ${weeksPregnant} weeks pregnant." He bluntly says.`,
+              `"You're pregnant." He bluntly says.`,
               "You're somehow taken aback from his words. You stand there watching him for a few minutes without saying anything, letting his words sink in.",
               '"I can\'t be pregnant!" You blurt out.',
               '"Well you can, and you are."',
-              "Oh god... What am I going to do?",
+              `After having a short discussion with your doctor about your menstrual cycle, you learn that you are ${weeksPregnant} weeks pregnant.`,
+              '"Oh god... What am I going to do?" You gasp.',
               "\"Well your options are pretty obvious. You can either get an abortion, or have the baby. We won't force you to choose now, take some time and come back to us when you've made your decision.\"",
               "This is a huge shock for you. What can you do? Having a baby is a huge responsibility, and you're way too young for that. But can you really bring yourself to kill it?",
               "You're so distraught that as soon as you get home you just go to bed, unable to think of anything else."
@@ -503,12 +637,24 @@ const App = () => {
               if (teacherChecksIfStudied) {
                 return [
                   "During a lesson the teacher asks you to respond to a question to see if you've been studying.",
-                  "Unfortunately you've been completely slacking off with your studies and you have no idea how to respond to the question.",
-                  "Well well, what a surprise. Maybe after some detention this evening you'll finally start taking your studies a bit more seriously.",
-                  "Looks like you'll have to stay in school for the day because of detention. Maybe you should start studying more from now on.",
-                  "You spend at least 4 hours helping the teacher moving files and rearranging them. It's very tiring work, especially since this teacher seems to have worked here for at least 30 years, he has stacks over stacks of papers.",
-                  "",
-                  "By the end of the day you're absolutely exhausted. After coming back home you go straight to bed."
+                  ...(() => {
+                    if (homeworkScore > 0) {
+                      return [
+                        "",
+                        "Luckily you have been studying and was able to answer the question.",
+                        "",
+                        "The teacher nods his head in approval and continues with the lesson."
+                      ];
+                    }
+                    return [
+                      "Unfortunately you've been completely slacking off with your studies and you have no idea how to respond to the question.",
+                      "Well well, what a surprise. Maybe after some detention this evening you'll finally start taking your studies a bit more seriously.",
+                      "Looks like you'll have to stay in school for the day because of detention. Maybe you should start studying more from now on.",
+                      "You spend at least 4 hours helping the teacher moving files and rearranging them. It's very tiring work, especially since this teacher seems to have worked here for at least 30 years, he has stacks over stacks of papers.",
+                      "",
+                      "By the end of the day you're absolutely exhausted. After coming back home you go straight to bed."
+                    ];
+                  })()
                 ];
               }
               return ["You have a normal day at school."];
@@ -516,6 +662,23 @@ const App = () => {
           ];
         }
         return ["It's the weekend!", "You're at your house."];
+      })(),
+      ...(() => {
+        if (amMenstruating && gestationalDate) {
+          return ["You're sure you've missed your period."];
+        }
+        if (amMenstruating) {
+          return ["You are having your period."];
+        }
+        if (amOvulating && !gestationalDate) {
+          return [
+            "Your breasts feel sore.",
+            "You feel like you can smell and taste better.",
+            "You feel a dull cramp on one side of your abdomen.",
+            "You have a feeling your period might be starting soon."
+          ];
+        }
+        return [];
       })(),
       "You're back at your house, you walk up the stairs and get in your room.",
       "You have the rest of the day free, what do you want to do?"
@@ -539,7 +702,8 @@ const App = () => {
         "work:camgirl",
         "work:waitress"
       ] as CurrentActivity[]
-    ).includes(currentActivity) || teacherChecksIfStudied;
+    ).includes(currentActivity) ||
+    (teacherChecksIfStudied && homeworkScore <= 0);
 
   return (
     <Container>
@@ -560,6 +724,7 @@ const App = () => {
               setCurrentActivity(
                 "prepareToGoOutTonight:goDanceForAWhile:followHim"
               );
+              setApproachedByGuyInClub(false);
             }}
           >
             Follow him
@@ -576,6 +741,7 @@ const App = () => {
               setCurrentActivity(
                 "prepareToGoOutTonight:goDanceForAWhile:dontFollowHim"
               );
+              setApproachedByGuyInClub(false);
             }}
           >
             Don't follow him
@@ -599,16 +765,10 @@ const App = () => {
                 // Deduct 2 every week
                 setHomeworkScore((prev) => prev - 2);
               }
-              setDueDate((prev) => {
-                if (!prev) {
-                  return date
-                    .add(range(37, 41), "weeks")
-                    .add(range(0, 6), "days");
-                }
-                return prev;
-              });
+              becomePregnant();
               setBAC(0);
               setCurrentActivity("default");
+              setApproachedByGuyInClub(false);
             }}
           >
             Continue
