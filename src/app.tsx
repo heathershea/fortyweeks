@@ -1,7 +1,12 @@
-import { globalCss, styled } from "@stitches/react";
 import dayjs from "dayjs";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useState } from "react";
+
+import { globalCss, styled } from "@stitches/react";
+
 import ToolbarButton from "./toolbar-button";
+import generateMenstrualCycleLength from "./utils/generate-menstrual-cycle-length";
+import range from "./utils/range";
+import useMenstrualCycle from "./utils/use-menstrual-cycle";
 
 const globalStyles = globalCss({
   body: { fontFamily: "sans-serif", margin: 0 },
@@ -122,18 +127,6 @@ const formatMoney = (amount: number) => {
   });
 };
 
-const generateMenstrualCycleLength = (prevLength: number) => {
-  return Math.floor((range(21, 35) + prevLength) / 2);
-};
-const generatePeriodLength = (prevLength: number) => {
-  return Math.floor(
-    (range(1, 10) + range(2, 7) + range(2, 7) + range(3, 8) + prevLength) / 5
-  );
-};
-
-const range = (min: number, max: number) =>
-  Math.floor(Math.random() * (max - min + 1) + min);
-
 const initialDate = dayjs().startOf("day");
 const prevMenstrualCycleLength = generateMenstrualCycleLength(28);
 const initialMenstrualCycleLength = generateMenstrualCycleLength(
@@ -149,113 +142,8 @@ const initialPrevMenstruationStart = initialMenstruationStart.subtract(
   "days"
 );
 
-const useMenstrualCycle = ({ date }: { date: dayjs.Dayjs }) => {
-  const [menstrualCycleLength, setMenstrualCycleLength] = useState(
-    initialMenstrualCycleLength
-  );
-  const [menstruationStart, setMenstruationStart] = useState<dayjs.Dayjs>(
-    initialMenstruationStart
-  );
-  const [previousMenstruationStart, setPreviousMenstruationStart] =
-    useState<dayjs.Dayjs>(initialPrevMenstruationStart);
-  const nextMenstruationStart = menstruationStart.add(
-    menstrualCycleLength,
-    "days"
-  );
-
-  const [periodLength, setPeriodLength] = useState(generatePeriodLength(4));
-  const menstruationEnd = menstruationStart.add(periodLength, "days");
-  const amMenstruating =
-    (date.isSame(menstruationStart) || date.isAfter(menstruationStart)) &&
-    (date.isSame(menstruationEnd) || date.isBefore(menstruationEnd));
-
-  const ovulationStart = menstruationStart.add(10, "days");
-  const ovulationEnd = ovulationStart.add(5, "days");
-
-  const amOvulating =
-    (date.isSame(ovulationStart) || date.isAfter(ovulationEnd)) &&
-    (date.isSame(ovulationEnd) || date.isBefore(ovulationEnd));
-
-  const [conceptionDate, setConceptionDate] = useState<dayjs.Dayjs>();
-  const gestationalDate = conceptionDate
-    ? previousMenstruationStart
-    : undefined;
-  const [dueDate, setDueDate] = useState<dayjs.Dayjs>();
-  const [amPregnant, setAmPregnant] = useState(false);
-
-  useEffect(() => {
-    if (dueDate && !amPregnant) {
-      if (
-        date.isSame(nextMenstruationStart) ||
-        date.isAfter(nextMenstruationStart)
-      ) {
-        setAmPregnant(true);
-      }
-    }
-  }, [amPregnant, date, dueDate, nextMenstruationStart]);
-
-  useEffect(() => {
-    if (date.isSame(nextMenstruationStart) && !amPregnant) {
-      // generate next menstrual cycle
-      const nextMenstruatrualCycleLength =
-        generateMenstrualCycleLength(menstrualCycleLength);
-      const nextPeriodLength = generatePeriodLength(periodLength);
-      setMenstrualCycleLength(nextMenstruatrualCycleLength);
-      setPeriodLength(nextPeriodLength);
-      setPreviousMenstruationStart(menstruationStart);
-      setMenstruationStart(nextMenstruationStart);
-    }
-  }, [
-    amPregnant,
-    date,
-    menstrualCycleLength,
-    menstruationEnd,
-    menstruationStart,
-    nextMenstruationStart,
-    ovulationEnd,
-    ovulationStart,
-    periodLength
-  ]);
-
-  const becomePregnant = () => {
-    const conceptionChance = Math.random();
-    if (
-      (amOvulating && conceptionChance < 1 / 3) ||
-      (amMenstruating && conceptionChance < 0.05) ||
-      conceptionChance < 0.01
-    ) {
-      setDueDate((prev) => {
-        if (!prev) {
-          return date.add(range(37, 41), "weeks").add(range(0, 6), "days");
-        }
-        return prev;
-      });
-      setConceptionDate((prev) => {
-        if (!prev) {
-          return date;
-        }
-        return prev;
-      });
-    }
-  };
-
-  const weeksPregnant = gestationalDate
-    ? Math.floor(date.diff(gestationalDate, "days") / 7)
-    : NaN;
-
-  return {
-    amOvulating,
-    amMenstruating,
-    amPregnant,
-    gestationalDate,
-    becomePregnant,
-    weeksPregnant
-  };
-};
-
 const App = () => {
   const [date, setDate] = useState(initialDate);
-  // average period is 28 days
 
   const {
     amPregnant,
@@ -264,7 +152,12 @@ const App = () => {
     gestationalDate,
     becomePregnant,
     weeksPregnant
-  } = useMenstrualCycle({ date });
+  } = useMenstrualCycle({
+    date,
+    initialPrevMenstruationStart,
+    initialMenstrualCycleLength,
+    initialMenstruationStart
+  });
 
   // https://www.calculator.net/bac-calculator.html
   const [bac, setBAC] = useState(0);
