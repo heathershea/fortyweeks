@@ -1,8 +1,12 @@
 {
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.formatOnSave": true,
   "editor.formatOnPaste": true,
+  "files.associations": {
+    ".envrc": "ini",
+    ".envrc.example": "ini"
+  },
   "typescript.tsdk": "node_modules/typescript/lib",
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
   "[shellscript]": {
     "editor.defaultFormatter": "foxundermoon.shell-format"
   },
