@@ -1,0 +1,6 @@
+local_user_name=$(git config --global user.name)
+local_user_email=$(git config --global user.name)
+git config user.name $local_user_name
+git config user.email $local_user_email
+## Replace id_rsa with the SSH key associated the user account used to upload your remote repository
+eval $(keychain --eval --quiet ~/.ssh/id_rsa)
