@@ -1,8 +1,7 @@
 import { globalCss, styled } from "@stitches/react";
+import { useEffect, useState } from "react";
 
 import ToolbarButton from "./components/toolbar-button";
-// @ts-ignore
-import startPage from "./pages/start.html";
 
 const globalStyles = globalCss({
   body: { fontFamily: "sans-serif", margin: 0 },
@@ -57,6 +56,13 @@ const Toolbar = styled("div", {
 });
 
 const App = () => {
+  const [content, setContent] = useState("");
+  useEffect(() => {
+    import("./content/start.html").then((res) => {
+      setContent(res.default);
+    });
+  }, []);
+  const day = "Monday";
   return (
     <Container>
       <Header>
@@ -71,9 +77,11 @@ const App = () => {
         <StatusBar>
           <ToolbarButton>Date here</ToolbarButton>
         </StatusBar>
-        <ContentContainer>
-          <iframe src={startPage} title="Content" />
-        </ContentContainer>
+        <ContentContainer
+          dangerouslySetInnerHTML={{
+            __html: content.replace("%DAY%", day)
+          }}
+        ></ContentContainer>
       </Main>
     </Container>
   );
